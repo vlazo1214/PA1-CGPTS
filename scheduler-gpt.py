@@ -20,8 +20,7 @@ class Process:
     def response_time(self, start):
         return max(start - self.arrival, 0)
 
-
-def fifo(processes, runtime):
+def fcfs(processes, runtime):
   arrive_counter = 0
   finished_counter = 0
   running = Process("", 0, -1)
@@ -71,16 +70,17 @@ def fifo(processes, runtime):
           if finished_proc.name == proc.name:
               proc.turnaround = finished_proc.finish - proc.arrival
 
-  calculate_metrics_fifo(processes)
+  calculate_metrics_fcfs(processes)
   return finished
 
 
-def calculate_metrics_fifo(processes):
+def calculate_metrics_fcfs(processes):
   for process in processes:
       turnaround = process.turnaround_time(process.finish - 1)
       response = process.response_time(process.start)
       print(
           f"{process.name} wait {process.wait:4} turnaround {turnaround:4} response {response:4}")
+
 
 def rr():
     pass
@@ -167,60 +167,59 @@ def calculate_metrics_sjf(processes, burst_time):
         print(
             f"{process.name} wait {wait:4} turnaround {turnaround:4} response {response:4}")
 
-
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: scheduler-gpt.py <input file>")
-        sys.exit(1)
+  if len(sys.argv) != 2:
+      print("Usage: scheduler-gpt.py <input file>")
+      sys.exit(1)
 
-    input_file = sys.argv[1]
+  input_file = sys.argv[1]
 
-    try:
-        with open(input_file, 'r') as file:
-            lines = file.readlines()
+  try:
+      with open(input_file, 'r') as file:
+          lines = file.readlines()
 
-        process_count = int(lines[0].split()[1])
-        run_for = int(lines[1].split()[1])
-        algorithm = lines[2].split()[1]
+      process_count = int(lines[0].split()[1])
+      run_for = int(lines[1].split()[1])
+      algorithm = lines[2].split()[1]
 
-        if algorithm == 'rr':
-            try:
-                quantum = int(lines[3].split()[1])
-            except IndexError:
-                print("Error: missing quantum for rr algorithm")
-                sys.exit(1)
-            processes_data = lines[4:-1]
-        else:
-            quantum = None
-            processes_data = lines[3:-1]
+      if algorithm == 'rr':
+          try:
+              quantum = int(lines[3].split()[1])
+          except IndexError:
+              print("Error: missing quantum for rr algorithm")
+              sys.exit(1)
+          processes_data = lines[4:-1]
+      else:
+          quantum = None
+          processes_data = lines[3:-1]
 
-        processes = []
-        for data in processes_data:
-            parts = data.split()
-            name = parts[2]
-            arrival = int(parts[4])
-            burst = int(parts[6])
-            processes.append(Process(name, arrival, burst))
+      processes = []
+      for data in processes_data:
+          parts = data.split()
+          name = parts[2]
+          arrival = int(parts[4])
+          burst = int(parts[6])
+          processes.append(Process(name, arrival, burst))
 
-        print(f"{process_count} processes")
-        if algorithm == 'sjf':
+      print(f"{process_count} processes")
+      if algorithm == 'sjf':
           print("Using preemptive Shortest Job First")
-        elif algorithm == 'fcfs':
-          print("Using First In First Out")
-        else:
+      elif algorithm == 'fcfs':
+          print("Using First-Come First-Served")
+      else:
           print(
               f"Using {algorithm}{' Quantum ' + str(quantum) if algorithm == 'rr' and quantum else ''}")
-  
-        if algorithm == 'fcfs':
-          fifo(processes, run_for)
-        elif algorithm == 'sjf':
+
+      if algorithm == 'sjf':
           sjf(processes, run_for)
-        elif algorithm == 'rr':
+      elif algorithm == 'rr':
           pass
-    except FileNotFoundError:
-        print(f"Error: file {input_file} not found")
-        sys.exit(1)
+      elif algorithm == 'fcfs':
+          fcfs(processes, run_for)
+  except FileNotFoundError:
+      print(f"Error: file {input_file} not found")
+      sys.exit(1)
 
 
 if __name__ == "__main__":
-    main()
+  main()
