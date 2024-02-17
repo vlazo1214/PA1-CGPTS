@@ -21,9 +21,66 @@ class Process:
         return max(start - self.arrival, 0)
 
 
-def fifo():
-    pass
+def fifo(processes, runtime):
+  arrive_counter = 0
+  finished_counter = 0
+  running = Process("", 0, -1)
 
+  order = processes.copy()
+  order.sort(key=lambda p: p.arrival)
+
+  waiting = []
+  finished = []
+
+  total_waiting_time = 0
+
+  for i in range(runtime):
+      while arrive_counter < len(order) and order[arrive_counter].arrival == i:
+          proc = order[arrive_counter]
+          waiting.append(proc)
+          proc.wait = 0
+          print(f"Time {i:4} : {proc.name} arrived")
+          arrive_counter += 1
+
+      if running.burst != -1:
+          running.burst -= 1
+          if running.burst == 0:
+              print(f"Time {i:4} : {running.name} finished")
+              running.finish = i + 1
+              finished.append(running)
+              finished_counter += 1
+              total_waiting_time += running.wait
+              running.burst = -1
+
+      if running.burst == -1:
+          if waiting:
+              running = waiting.pop(0)
+              if not running.has_started:
+                  running.start = i
+                  running.has_started = True
+                  running.wait = i - running.arrival
+              print(
+                  f"Time {i:4} : {running.name} selected (burst {running.burst})")
+          else:
+              print(f"Time {i:4} : Idle")
+
+  print(f"Finished at time {runtime}\n")
+
+  for finished_proc in finished:
+      for proc in processes:
+          if finished_proc.name == proc.name:
+              proc.turnaround = finished_proc.finish - proc.arrival
+
+  calculate_metrics_fifo(processes)
+  return finished
+
+
+def calculate_metrics_fifo(processes):
+  for process in processes:
+      turnaround = process.turnaround_time(process.finish - 1)
+      response = process.response_time(process.start)
+      print(
+          f"{process.name} wait {process.wait:4} turnaround {turnaround:4} response {response:4}")
 
 def rr():
     pass
@@ -147,17 +204,19 @@ def main():
 
         print(f"{process_count} processes")
         if algorithm == 'sjf':
-            print("Using preemptive Shortest Job First")
+          print("Using preemptive Shortest Job First")
+        elif algorithm == 'fcfs':
+          print("Using First In First Out")
         else:
-            print(
-                f"Using {algorithm}{' Quantum ' + str(quantum) if algorithm == 'rr' and quantum else ''}")
-
-        if algorithm == 'fifo':
-            pass
+          print(
+              f"Using {algorithm}{' Quantum ' + str(quantum) if algorithm == 'rr' and quantum else ''}")
+  
+        if algorithm == 'fcfs':
+          fifo(processes, run_for)
         elif algorithm == 'sjf':
-            sjf(processes, run_for)
+          sjf(processes, run_for)
         elif algorithm == 'rr':
-            pass
+          pass
     except FileNotFoundError:
         print(f"Error: file {input_file} not found")
         sys.exit(1)
