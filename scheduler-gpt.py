@@ -8,8 +8,10 @@ class Process:
         self.name = name
         self.arrival = arrival
         self.burst = burst
+        self.remaining = burst
         self.start = -1
         self.finish = -1
+        self.response = -1
         self.wait = 0
         self.turnaround = 0
         self.has_started = False
@@ -81,40 +83,90 @@ def calculate_metrics_fcfs(processes):
       print(
           f"{process.name} wait {process.wait:4} turnaround {turnaround:4} response {response:4}")
 
+def calculate_metrics_rr(processes):
+    total_turnaround_time = 0
+    total_response_time = 0
+    total_waiting_time = 0
 
-def rr(processes, quantum, run_for):
-    ready_queue = []
+    print("Metrics:")
+    for process in processes:
+        turnaround = process.turnaround_time(process.finish - 1)
+        response = process.response_time(process.start)
+        wait = turnaround - (process.burst - process.wait)
+        
+        total_turnaround_time += turnaround
+        total_response_time += response
+        total_waiting_time += wait
+        
+        print(f"{process.name} wait {wait:4} turnaround {turnaround:4} response {response:4}")
+
+    # if len(processes) != 0:
+    #     avg_turnaround_time = total_turnaround_time / len(processes)
+    #     avg_response_time = total_response_time / len(processes)
+    #     avg_waiting_time = total_waiting_time / len(processes)
+
+    #     print(f"Average Turnaround Time: {avg_turnaround_time}")
+    #     print(f"Average Response Time: {avg_response_time}")
+    #     print(f"Average Waiting Time: {avg_waiting_time}")
+
+
+def rr(processes, runtime, quantum):
+    waiting = []
+    finished = []
     current_time = 0
-    idx = 0
+    quantum_counter = 0
+
     print(f"{len(processes)} processes")
-    print(f"Using Round-Robin")
+    print("Using Round-Robin")
     print(f"Quantum   {quantum}\n")
-    while current_time < run_for or ready_queue:
-        while idx < len(processes) and processes[idx].arrival <= current_time:
-            ready_queue.append(processes[idx])
-            print(f"Time   {current_time} : {processes[idx].name} arrived")
-            idx += 1
-        if not ready_queue:
-            print(f"Time   {current_time} : Idle")
-            current_time += 1
-            continue
-        process = ready_queue.pop(0)
-        print(f"Time   {current_time} : {process.name} selected (burst   {process.remaining_time})")
-        if process.start_time == -1:
-            process.start_time = current_time
-            process.response_time = current_time - process.arrival
-        if process.remaining_time <= quantum:
-            current_time += process.remaining_time
-            process.finish_time = current_time
-            process.turnaround_time = process.finish_time - process.arrival
-            process.remaining_time = 0
-            print(f"Time   {current_time} : {process.name} finished")
+
+    while processes or waiting:
+        for process in processes[:]:
+            if process.arrival <= current_time:
+                waiting.append(process)
+                processes.remove(process)
+        
+        if waiting:
+            current_process = waiting.pop(0)
+            if not current_process.has_started:
+                current_process.start = current_time
+                current_process.has_started = True
+                current_process.wait = current_time - current_process.arrival
+
+            print(f"Time {current_time:4} : {current_process.name} selected (burst {current_process.burst})")
+
+            if current_process.burst > quantum:
+                current_process.burst -= quantum
+                quantum_counter = quantum
+                while quantum_counter > 0:
+                    current_time += 1
+                    quantum_counter -= 1
+                    for process in processes[:]:
+                        if process.arrival <= current_time:
+                            waiting.append(process)
+                            processes.remove(process)
+                    if waiting:
+                        break
+                    print(f"Time {current_time:4} : Idle")
+            else:
+                quantum_counter = current_process.burst
+                current_time += current_process.burst
+                current_process.finish = current_time
+                current_process.burst = 0
+                finished.append(current_process)
+                print(f"Time {current_time:4} : {current_process.name} finished")
         else:
-            current_time += quantum
-            process.remaining_time -= quantum
-            ready_queue.append(process)
-    print(f"Time   {current_time} : Idle")
-    print(f"Finished at time  {current_time}\n")
+            current_time += 1
+            print(f"Time {current_time:4} : Idle")
+
+    print(f"Finished at time {runtime}\n")
+
+    for finished_proc in finished:
+        for proc in processes:
+            if finished_proc.name == proc.name:
+                proc.turnaround = finished_proc.finish - proc.arrival
+
+    calculate_metrics_rr(processes)
 
 
 def sjf(processes, runtime):
@@ -189,7 +241,6 @@ def sjf(processes, runtime):
     calculate_metrics_sjf(processes, burst_time)
     return finished
 
-
 def calculate_metrics_sjf(processes, burst_time):
     for process in processes:
         turnaround = process.turnaround_time(process.finish - 1)
@@ -236,14 +287,16 @@ def main():
           print("Using preemptive Shortest Job First")
       elif algorithm == 'fcfs':
           print("Using First-Come First-Served")
-      else:
+      else: # elif algorithm == 'rr' and then add another else for edge cases
           print(
               f"Using {algorithm}{' Quantum ' + str(quantum) if algorithm == 'rr' and quantum else ''}")
 
       if algorithm == 'sjf':
           sjf(processes, run_for)
       elif algorithm == 'rr':
-          rr(processes, quantum, run_for)
+          #rr(processes, run_for, quantum)
+          finished_processes = rr(processes, run_for, quantum)
+          calculate_metrics_rr(finished_processes)
       elif algorithm == 'fcfs':
           fcfs(processes, run_for)
   except FileNotFoundError:
