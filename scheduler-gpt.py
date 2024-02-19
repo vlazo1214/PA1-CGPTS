@@ -88,7 +88,7 @@ def calculate_metrics_rr(processes):
     total_response_time = 0
     total_waiting_time = 0
 
-    print("Metrics:")
+    #print("Metrics:")
     for process in processes:
         turnaround = process.turnaround_time(process.finish - 1)
         response = process.response_time(process.start)
@@ -109,55 +109,54 @@ def calculate_metrics_rr(processes):
     #     print(f"Average Response Time: {avg_response_time}")
     #     print(f"Average Waiting Time: {avg_waiting_time}")
 
-
 def rr(processes, runtime, quantum):
     waiting = []
     finished = []
     current_time = 0
     quantum_counter = 0
+    current_process = None
 
     print(f"{len(processes)} processes")
     print("Using Round-Robin")
     print(f"Quantum   {quantum}\n")
 
-    while processes or waiting:
+    while processes or waiting or current_process:
         for process in processes[:]:
             if process.arrival <= current_time:
                 waiting.append(process)
+                print(f"Time {current_time:4} : {process.name} arrived")
                 processes.remove(process)
         
-        if waiting:
+        if current_process:
+            quantum_counter += 1
+            current_process.remaining -= 1
+            if current_process.remaining == 0:
+                current_process.finish = current_time
+                finished.append(current_process)
+                print(f"Time {current_time:4} : {current_process.name} finished")
+                current_process = None
+            elif quantum_counter == quantum:
+                waiting.append(current_process)
+                #print(f"Time {current_time:4} : {current_process.name} preempted (burst {current_process.remaining})")
+                current_process = None
+                quantum_counter = 0
+
+        if not current_process and waiting:
             current_process = waiting.pop(0)
             if not current_process.has_started:
                 current_process.start = current_time
                 current_process.has_started = True
                 current_process.wait = current_time - current_process.arrival
-
-            print(f"Time {current_time:4} : {current_process.name} selected (burst {current_process.burst})")
-
-            if current_process.burst > quantum:
-                current_process.burst -= quantum
-                quantum_counter = quantum
-                while quantum_counter > 0:
-                    current_time += 1
-                    quantum_counter -= 1
-                    for process in processes[:]:
-                        if process.arrival <= current_time:
-                            waiting.append(process)
-                            processes.remove(process)
-                    if waiting:
-                        break
-                    print(f"Time {current_time:4} : Idle")
-            else:
-                quantum_counter = current_process.burst
-                current_time += current_process.burst
-                current_process.finish = current_time
-                current_process.burst = 0
-                finished.append(current_process)
-                print(f"Time {current_time:4} : {current_process.name} finished")
-        else:
-            current_time += 1
+            quantum_counter = 0
+            print(f"Time {current_time:4} : {current_process.name} selected (burst {current_process.remaining})")
+        
+        #if not current_process and not waiting and processes:
+        if not current_process and not waiting:
             print(f"Time {current_time:4} : Idle")
+            current_time += 1
+            continue
+        
+        current_time += 1
 
     print(f"Finished at time {runtime}\n")
 
@@ -294,9 +293,9 @@ def main():
       if algorithm == 'sjf':
           sjf(processes, run_for)
       elif algorithm == 'rr':
-          #rr(processes, run_for, quantum)
-          finished_processes = rr(processes, run_for, quantum)
-          calculate_metrics_rr(finished_processes)
+          rr(processes, run_for, quantum)
+          #finished_processes = rr(processes, run_for, quantum)
+          #calculate_metrics_rr(finished_processes)
       elif algorithm == 'fcfs':
           fcfs(processes, run_for)
   except FileNotFoundError:
